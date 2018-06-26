@@ -1,7 +1,7 @@
 import tensorflow as tf
 from tensorflow.python.keras._impl.keras.layers import Conv2D
 from tensorflow.python.keras._impl.keras.layers import Dense
-from tensorflow.python.keras._impl.keras.layers import Flatten
+from tensorflow.python.keras._impl.keras.layers import Reshape
 from tensorflow.python.keras._impl.keras.layers import GlobalAveragePooling2D
 from tensorflow.python.keras._impl.keras.layers import GlobalMaxPooling2D
 from tensorflow.python.keras._impl.keras.layers import Input
@@ -59,12 +59,13 @@ for idx, layer in enumerate(reversed(encoder.layers)):
     else:
         # Otherwise it must be an Input layer from the encoder, which has no corresponding layer in the decoder
         assert type(layer) == InputLayer
-
 x = Conv2D(filters=n_classes,
            kernel_size=(1, 1),
-           activation='softmax',
+           activation=None,
            kernel_initializer='glorot_normal',
-           name='softmax_classifier')(x)  # I hope softmax actually operates along the last tensor dimension
+           name='1x1_convolution')(x)  # I hope softmax actually operates along the last tensor dimension
+x = Reshape((input_shape[0]*input_shape[1], 2), name='flatten_image')(x)
+x = Softmax(name='softmax_classifier')(x)
 
 model = tf.keras.Model(encoder.input, x)
 model.summary()
@@ -166,7 +167,6 @@ optimizer = SGD(lr=.1, momentum=.9)
 model.compile(optimizer=optimizer, loss='categorical_crossentropy')
 model.fit(x=X_train,
           y=Y_train,
-          class_weight=weights_dic,
           validation_data=(X_val, Y_val),
           batch_size=12,
           epochs=10,
@@ -181,7 +181,8 @@ Y_pred = model.predict(x=X, batch_size=2, verbose=0)
 Path('output').mkdir(exist_ok=True)
 
 for x_test, y_pred, path in zip(X_orig, Y_pred, image_paths):
-    image_mask = (y_pred[:, :, 1] > .5) * 1
+    image_mask = np.reshape(y_pred, (input_shape[0], input_shape[1], 2))
+    image_mask = (image_mask[:, :, 1] > .5) * 1
     x_test[:, :, 0] = x_test[:, :, 0] + image_mask * 255
     x_test = np.minimum(x_test, np.ones_like(x_test) * 255)
     output_path = Path('output') / Path('inf_' + Path(path).resolve().name)
