@@ -52,7 +52,7 @@ for idx, layer in enumerate(reversed(encoder.layers)):
     elif type(layer) == Conv2D:  # Convolution -> same convolution, but with no activation function
         x = Conv2D(filters=layer.filters,
                    kernel_size=layer.kernel_size,
-                   activation=None,
+                   activation=None,  # TODO do I need Relu here?
                    padding=layer.padding,
                    kernel_initializer='glorot_normal',
                    name=layer.name + '_dec')(x)
@@ -163,13 +163,19 @@ paths_val = split['paths_test']
 # TODO add data augmentation
 # TODO pre-process and normalize input images (what color space is best?)
 
-optimizer = SGD(lr=.1, momentum=.9)
-model.compile(optimizer=optimizer, loss='categorical_crossentropy')
+# optimizer = SGD(lr=.01, momentum=.9)
+optimizer = Adagrad()
+model.compile(optimizer=optimizer, loss='categorical_crossentropy', metrics=['accuracy'], sample_weight_mode='temporal')
+# Y_1 = np.reshape(Y[:, :, :, 1], (-1, input_shape[0]*input_shape[1]))
+sample_weight = np.zeros_like(Y_train[:, :, 1])
+sample_weight[Y_train[:, :, 1]==1]=1.
+sample_weight[Y_train[:, :, 1]==0]=.175
 model.fit(x=X_train,
           y=Y_train,
+          sample_weight=sample_weight,
           validation_data=(X_val, Y_val),
           batch_size=12,
-          epochs=10,
+          epochs=3,
           verbose=1,
           shuffle=True)
 
